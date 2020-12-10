@@ -35,12 +35,12 @@ collected in the past 10 seconds). The board will then send back the result to y
 #define ACLK 0x0100 // Timer_A ACLK source
 #define UP 0x0010 // Timer_A UP mode
 #define TAIfg 0x0001 // Used to look at Timer A Interrupt Flag
-#define TIMESPAN 16000
+#define TIMESPAN 16000 // serial communication changes the clock rate, define a timespan for 1s
 
 int cnt = 0;
 int index = 0; // point to the current insert position
-// initailize temperature queue, default -99, in FIFO
-float queue[SIZE] = {-99, -99, -99, -99, -99, -99, -99, -99, -99, -99};
+// initailize temperature queue, default 0, in FIFO
+float queue[SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 unsigned int temp;
 volatile float tempDegC;
 volatile float tempDegF;
@@ -164,16 +164,40 @@ void avg()
     }
 }
 
-// Round Robin Scheduling Simulator
-void scheduler()
+// Display items in temperature queue
+void show_queue()
 {
+    int i;
+    while (!(UCA1IFG&UCTXIFG)); // USCI_A0 TX buffer ready for new data?
+    UCA1TXBUF = '[';
+    for (i=0; i<SIZE; i++)
+    {
+        // Convert to string
+        char buffer[3];
+        int t = round(queue[i]);
+        buffer[0] = '0' + t / 100;
+        t %= 100;
+        buffer[1] = '0' + t / 10;
+        t %= 10;
+        buffer[2] = '0' + t;
 
-}
+        int j;
+        for (j=0; j<sizeof(buffer); j++)
+        {
+            while (!(UCA1IFG&UCTXIFG)); // USCI_A0 TX buffer ready for new data?
+            UCA1TXBUF = buffer[j]; //Send the UART message out pin P3.4 by resign it to the buffer UCA1TXBUF
+        }
 
-// Semaphore Simulator
-void semaphore()
-{
-
+        while (!(UCA1IFG&UCTXIFG)); // USCI_A0 TX buffer ready for new data?
+        if (i == SIZE - 1)
+        {
+            UCA1TXBUF = ']';
+        }
+        else
+        {
+            UCA1TXBUF = ',';
+        }
+    }
 }
 
 void main()
@@ -220,9 +244,8 @@ void main()
 
     char const instruc[] = "This program helps you to get temperature data from MSP430FR6989 board.\n\r"
                            "Please enter the number to do the following: \n\r"
-                           "1. Get average temperature for lastest 10 seconds.\n\r"
-                           "2. Round Robin Scheduling Simulator.\n\r"
-                           "3. Semaphore Simulator.\n\r";
+                           "1. Display temperature in queue.\n\r"
+                           "2. Get average temperature for lastest 10 seconds.\n\r";
     int i;
     for (i=0; i<sizeof(instruc); i++)
     {
@@ -250,15 +273,11 @@ __interrupt void USCI_A1_ISR(void)
 {
     if(UCA1RXBUF == '1')
     {
-        avg();
+        show_queue();
     }
     else if(UCA1RXBUF == '2')
     {
-        scheduler();
-    }
-    else if(UCA1RXBUF == '3')
-    {
-        semaphore();
+        avg();
     }
 
     UCA0IFG = UCA0IFG & (~UCRXIFG); // Reset the UART receive flag
