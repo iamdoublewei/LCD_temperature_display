@@ -4,6 +4,7 @@ CS5463 Embedded System Final Project
 
 ## Introduction 
 • Microcontroller Board: Texas Instruments MSP430FR6989 LaunchPad.
+
 • This project will combine the knowledge of all the mini projects, sensor/adc, and LCD. 
 - _Button and LED 
 - _UART 
